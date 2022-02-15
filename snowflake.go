@@ -2,19 +2,16 @@
 package snowflake
 
 import (
-	"encoding/base64"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"strconv"
 	"sync"
 	"time"
 )
 
 var (
-	// Epoch is set to the twitter snowflake epoch of Nov 04 2010 01:42:54 UTC in milliseconds
-	// You may customize this to set a different epoch for your application.
-	Epoch int64 = 1288834974657
+	// Epoch is set to the epoch of 2022-02-22T22:22:22Z UTC in milliseconds
+	Epoch int64 = 1645568542222
 
 	// NodeBits holds the number of bits to use for Node
 	// Remember, you have a total 22 bits to share between Node/Step
@@ -23,14 +20,6 @@ var (
 	// StepBits holds the number of bits to use for Step
 	// Remember, you have a total 22 bits to share between Node/Step
 	StepBits uint8 = 12
-
-	// DEPRECATED: the below four variables will be removed in a future release.
-	mu        sync.Mutex
-	nodeMax   int64 = -1 ^ (-1 << NodeBits)
-	nodeMask        = nodeMax << StepBits
-	stepMask  int64 = -1 ^ (-1 << StepBits)
-	timeShift       = NodeBits + StepBits
-	nodeShift       = StepBits
 )
 
 const encodeBase32Map = "ybndrfg8ejkmcpqxot1uwisza345h769"
@@ -45,7 +34,7 @@ var decodeBase58Map [256]byte
 type JSONSyntaxError struct{ original []byte }
 
 func (j JSONSyntaxError) Error() string {
-	return fmt.Sprintf("invalid snowflake ID %q", string(j.original))
+	return "invalid snowflake ID" + string(j.original)
 }
 
 // ErrInvalidBase58 is returned by ParseBase58 when given an invalid []byte
@@ -98,17 +87,6 @@ type ID int64
 // NewNode returns a new snowflake node that can be used to generate snowflake
 // IDs
 func NewNode(node int64) (*Node, error) {
-
-	// re-calc in case custom NodeBits or StepBits were set
-	// DEPRECATED: the below block will be removed in a future release.
-	mu.Lock()
-	nodeMax = -1 ^ (-1 << NodeBits)
-	nodeMask = nodeMax << StepBits
-	stepMask = -1 ^ (-1 << StepBits)
-	timeShift = NodeBits + StepBits
-	nodeShift = StepBits
-	mu.Unlock()
-
 	n := Node{}
 	n.node = node
 	n.nodeMax = -1 ^ (-1 << NodeBits)
@@ -183,120 +161,6 @@ func ParseString(id string) (ID, error) {
 
 }
 
-// Base2 returns a string base2 of the snowflake ID
-func (f ID) Base2() string {
-	return strconv.FormatInt(int64(f), 2)
-}
-
-// ParseBase2 converts a Base2 string into a snowflake ID
-func ParseBase2(id string) (ID, error) {
-	i, err := strconv.ParseInt(id, 2, 64)
-	return ID(i), err
-}
-
-// Base32 uses the z-base-32 character set but encodes and decodes similar
-// to base58, allowing it to create an even smaller result string.
-// NOTE: There are many different base32 implementations so becareful when
-// doing any interoperation.
-func (f ID) Base32() string {
-
-	if f < 32 {
-		return string(encodeBase32Map[f])
-	}
-
-	b := make([]byte, 0, 12)
-	for f >= 32 {
-		b = append(b, encodeBase32Map[f%32])
-		f /= 32
-	}
-	b = append(b, encodeBase32Map[f])
-
-	for x, y := 0, len(b)-1; x < y; x, y = x+1, y-1 {
-		b[x], b[y] = b[y], b[x]
-	}
-
-	return string(b)
-}
-
-// ParseBase32 parses a base32 []byte into a snowflake ID
-// NOTE: There are many different base32 implementations so becareful when
-// doing any interoperation.
-func ParseBase32(b []byte) (ID, error) {
-
-	var id int64
-
-	for i := range b {
-		if decodeBase32Map[b[i]] == 0xFF {
-			return -1, ErrInvalidBase32
-		}
-		id = id*32 + int64(decodeBase32Map[b[i]])
-	}
-
-	return ID(id), nil
-}
-
-// Base36 returns a base36 string of the snowflake ID
-func (f ID) Base36() string {
-	return strconv.FormatInt(int64(f), 36)
-}
-
-// ParseBase36 converts a Base36 string into a snowflake ID
-func ParseBase36(id string) (ID, error) {
-	i, err := strconv.ParseInt(id, 36, 64)
-	return ID(i), err
-}
-
-// Base58 returns a base58 string of the snowflake ID
-func (f ID) Base58() string {
-
-	if f < 58 {
-		return string(encodeBase58Map[f])
-	}
-
-	b := make([]byte, 0, 11)
-	for f >= 58 {
-		b = append(b, encodeBase58Map[f%58])
-		f /= 58
-	}
-	b = append(b, encodeBase58Map[f])
-
-	for x, y := 0, len(b)-1; x < y; x, y = x+1, y-1 {
-		b[x], b[y] = b[y], b[x]
-	}
-
-	return string(b)
-}
-
-// ParseBase58 parses a base58 []byte into a snowflake ID
-func ParseBase58(b []byte) (ID, error) {
-
-	var id int64
-
-	for i := range b {
-		if decodeBase58Map[b[i]] == 0xFF {
-			return -1, ErrInvalidBase58
-		}
-		id = id*58 + int64(decodeBase58Map[b[i]])
-	}
-
-	return ID(id), nil
-}
-
-// Base64 returns a base64 string of the snowflake ID
-func (f ID) Base64() string {
-	return base64.StdEncoding.EncodeToString(f.Bytes())
-}
-
-// ParseBase64 converts a base64 string into a snowflake ID
-func ParseBase64(id string) (ID, error) {
-	b, err := base64.StdEncoding.DecodeString(id)
-	if err != nil {
-		return -1, err
-	}
-	return ParseBytes(b)
-
-}
-
 // Bytes returns a byte slice of the snowflake ID
 func (f ID) Bytes() []byte {
 	return []byte(f.String())
@@ -320,24 +184,6 @@ func (f ID) IntBytes() [8]byte {
 // a snowflake ID
 func ParseIntBytes(id [8]byte) ID {
 	return ID(int64(binary.BigEndian.Uint64(id[:])))
-}
-
-// Time returns an int64 unix timestamp in milliseconds of the snowflake ID time
-// DEPRECATED: the below function will be removed in a future release.
-func (f ID) Time() int64 {
-	return (int64(f) >> timeShift) + Epoch
-}
-
-// Node returns an int64 of the snowflake ID node number
-// DEPRECATED: the below function will be removed in a future release.
-func (f ID) Node() int64 {
-	return int64(f) & nodeMask >> nodeShift
-}
-
-// Step returns an int64 of the snowflake step (or sequence) number
-// DEPRECATED: the below function will be removed in a future release.
-func (f ID) Step() int64 {
-	return int64(f) & stepMask
 }
 
 // MarshalJSON returns a json byte array string of the snowflake ID.
