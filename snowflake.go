@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	// Epoch is set to the epoch of 2022-02-22T22:22:22Z UTC in milliseconds
-	Epoch int64 = 1645568542222
+	// Epoch is set to the epoch of 2022-02-22T22:22:22.222Z UTC in milliseconds
+	Epoch int64 = 1645539742222
 
 	// NodeBits holds the number of bits to use for Node
 	// Remember, you have a total 22 bits to share between Node/Step
@@ -22,46 +22,11 @@ var (
 	StepBits uint8 = 12
 )
 
-const encodeBase32Map = "ybndrfg8ejkmcpqxot1uwisza345h769"
-
-var decodeBase32Map [256]byte
-
-const encodeBase58Map = "123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"
-
-var decodeBase58Map [256]byte
-
 // A JSONSyntaxError is returned from UnmarshalJSON if an invalid ID is provided.
 type JSONSyntaxError struct{ original []byte }
 
 func (j JSONSyntaxError) Error() string {
 	return "invalid snowflake ID" + string(j.original)
-}
-
-// ErrInvalidBase58 is returned by ParseBase58 when given an invalid []byte
-var ErrInvalidBase58 = errors.New("invalid base58")
-
-// ErrInvalidBase32 is returned by ParseBase32 when given an invalid []byte
-var ErrInvalidBase32 = errors.New("invalid base32")
-
-// Create maps for decoding Base58/Base32.
-// This speeds up the process tremendously.
-func init() {
-
-	for i := 0; i < len(decodeBase58Map); i++ {
-		decodeBase58Map[i] = 0xFF
-	}
-
-	for i := 0; i < len(encodeBase58Map); i++ {
-		decodeBase58Map[encodeBase58Map[i]] = byte(i)
-	}
-
-	for i := 0; i < len(decodeBase32Map); i++ {
-		decodeBase32Map[i] = 0xFF
-	}
-
-	for i := 0; i < len(encodeBase32Map); i++ {
-		decodeBase32Map[encodeBase32Map[i]] = byte(i)
-	}
 }
 
 // A Node struct holds the basic information needed for a snowflake generator
